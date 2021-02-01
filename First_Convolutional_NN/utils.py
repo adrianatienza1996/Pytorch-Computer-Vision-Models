@@ -2,6 +2,8 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 import torch.nn as nn
 from torch.optim import Adam
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 
 class FMNISTDataset (Dataset):
     def __init__ (self, x, y):
@@ -71,7 +73,7 @@ def accuracy(x, y, model):
     return is_correct.cpu().numpy().tolist()
 
 @torch.no_grad()
-def val_loss(x, y, model):
+def val_loss(x, y, model, loss_fn):
     model.eval()
     prediction = model(x)
     val_loss = loss_fn(prediction, y)
