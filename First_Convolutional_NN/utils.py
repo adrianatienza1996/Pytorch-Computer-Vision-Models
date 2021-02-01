@@ -5,27 +5,32 @@ from torch.optim import Adam
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-class FMNISTDataset (Dataset):
-    def __init__ (self, x, y):
-        
-        x = x.float() / 255
-        x = x.view(-1, 1, 28, 28)
+class FMNISTDataset(Dataset):
+    def __init__(self, x, y, aug=None):
         self.x, self.y = x, y
-        
-    def __len__(self):
-        return len(self.x)
-    
-    def __getitem__ (self, idx):
-        x, y = self.x[idx], self.y[idx]
-        return x.to(device), y.to(device)
+        self.aug = aug
+
+    def __getitem__(self, ix):
+        x, y = self.x[ix], self.y[ix]
+        return x, y
+
+    def __len__(self): return len(self.x)
+
+    def collate_fn(self, batch):
+        'logic to modify a batch of images'
+        ims, classes = list(zip(*batch))
+        if self.aug: ims=self.aug.augment_images(images=ims)
+
+        ims = torch.tensor(ims)[:,None,:,:].to(device)/255.
+        classes = torch.tensor(classes).to(device)
+        return ims, classes
 
 
-def get_data(tr_images, tr_targets, val_images, val_targets):
-    train = FMNISTDataset(tr_images, tr_targets)
-    trn_dl = DataLoader(train, batch_size=32, shuffle=True)
-    
+def get_data(tr_images, tr_targets, val_images, val_targets, aug):
+    train = FMNISTDataset(tr_images, tr_targets, aug=aug)
+    trn_dl = DataLoader(train, batch_size=64, collate_fn=train.collate_fn, shuffle=True)
     val = FMNISTDataset(val_images, val_targets)
-    val_dl = DataLoader(val, batch_size=len(val_images), shuffle=False)
+    val_dl = DataLoader(val, batch_size=len(val_images), collate_fn=val.collate_fn, shuffle=True)
     return trn_dl, val_dl
 
 def get_model():

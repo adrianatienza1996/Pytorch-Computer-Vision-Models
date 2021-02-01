@@ -12,27 +12,39 @@ from utils import get_data, get_model, train_batch, val_loss, accuracy
 
 
 from torchvision import datasets
+from imgaug import augmenters as iaa
+from imgaug.augmenters.size import KeepSizeByResize
 data_folder = '~/Data'
 
 fmnist = datasets.FashionMNIST(data_folder, download=True, train=True)
-tr_images = fmnist.data
-tr_targets = fmnist.targets
+tr_images = fmnist.data.numpy()
+tr_targets = fmnist.targets.numpy()
 print ("Data Shape: " + str(tr_images.shape))
 print ("Target Shape: " + str(tr_targets.shape))
 
 val_fmnist = datasets.FashionMNIST(data_folder,download=True, train=False)
-val_images = val_fmnist.data
-val_targets = val_fmnist.targets
+val_images = val_fmnist.data.numpy()
+val_targets = val_fmnist.targets.numpy()
 print ("Data Shape: " + str(val_images.shape))
 print ("Target Shape: " + str(val_targets.shape))
 
-# Training procedure
+print(type(tr_images[0]))
+# Defining Data Augmentation Pipeline
+aug = iaa.Sequential([
+    iaa.Affine(translate_px = {"x" : (-10 , 10),
+                               "mode" : "constant"}),
+    iaa.SaltAndPepper(0.2),
+    iaa.GaussianBlur(1),
+    KeepSizeByResize(iaa.Affine(rotate = (-30, 30), fit_output = True))
+])
 
+# Training procedure
 epochs = 5
 model, loss_fn, optimizer = get_model()
 #summary(model, (1, 28, 28))
 
-tr_dl, val_dl = get_data(tr_images, tr_targets, val_images, val_targets)
+
+tr_dl, val_dl = get_data(tr_images, tr_targets, val_images, val_targets, aug)
 
 scheduler = optim.lr_scheduler.ReduceLROnPlateau (optimizer,
                                                  factor = 0.5,
@@ -73,4 +85,3 @@ for epoch in range (epochs):
 
 torch.save(model.to("cpu").state_dict(), "Saved_Model/my_model.pth")
 print ("Model Saved")
-
