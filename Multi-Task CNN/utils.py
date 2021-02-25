@@ -60,7 +60,7 @@ def get_data (train_csv_path, test_csv_path, path):
     val = GenderAgeDataset(test_df, path)
 
     train_loader = DataLoader(trn, batch_size=32, shuffle=True, drop_last=True, collate_fn=trn.collate_fn)
-    test_loader = DataLoader(val, batch_size=32,  collate_fn=val.collate_fn)
+    test_loader = DataLoader(val, batch_size=test_csv_path.shape[0],  collate_fn=val.collate_fn)
     return train_loader, test_loader
 
 
@@ -68,7 +68,6 @@ def train_batch(data, model, opt, loss_fn):
     model.train()
     gender_criterion, race_criterion, age_criterion = loss_fn
     img, age, race, gender = data
-    print(type(gender))
     prediction_age, prediction_race, prediction_gender = model(img)
     l2_regularization = 0
     for param in model.parameters():
@@ -96,7 +95,7 @@ def accuracy(data, model):
     is_correct_race = argmaxes_race == race
 
     prediction_gender = (prediction_gender > 0.5).squeeze()
-    gender_account = (prediction_gender == gender).float().sum()
+    gender_account = (prediction_gender == gender).float().cpu().numpy().sum()
 
     return is_correct_age.cpu().numpy().tolist(), is_correct_race.cpu().numpy().tolist(), gender_account
 

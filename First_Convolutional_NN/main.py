@@ -28,7 +28,6 @@ val_targets = val_fmnist.targets.numpy()
 print ("Data Shape: " + str(val_images.shape))
 print ("Target Shape: " + str(val_targets.shape))
 
-print(type(tr_images[0]))
 # Defining Data Augmentation Pipeline
 aug = iaa.Sequential([
     iaa.Affine(translate_px = {"x" : (-10 , 10),
@@ -85,3 +84,5 @@ for epoch in range (epochs):
 
 torch.save(model.to("cpu").state_dict(), "Saved_Model/my_model.pth")
 print ("Model Saved")
+
+plt.plot()
