@@ -45,9 +45,9 @@ class CNNBlock(nn.Module):
 
 
 class SqueezeExcitation(nn.Module):
-    def __init__(self, c_in):
+    def __init__(self, c_in, redution=4):
         super(SqueezeExcitation, self).__init__()
-        self.hidden_channels = int(ceil(c_in/4))
+        self.hidden_channels = redution
         self.se = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(c_in,
@@ -70,15 +70,13 @@ class SqueezeExcitation(nn.Module):
 class InvertedResidualBlock(nn.Module):
     def __init__(self, c_in, c_out, kernel_size, stride, padding, expand_ratio, survival_prob):
         super(InvertedResidualBlock, self).__init__()
-        self.increase_channels = c_in != c_out
         self.channels_h = c_out * expand_ratio
         self.survival_prob = survival_prob
-
-        if self.increase_channels:
-            self.first_conv = CNNBlock(c_in, c_out, kernel_size=3, stride=1, padding=1)
+        print(c_in != c_out)
+        self.skip_sto_depth = stride == 2 or c_in != c_out
 
         self.conv = nn.Sequential(
-            CNNBlock(c_out,
+            CNNBlock(c_in,
                      self.channels_h,
                      kernel_size=1,
                      stride=1,
@@ -94,26 +92,33 @@ class InvertedResidualBlock(nn.Module):
             SqueezeExcitation(self.channels_h),
 
             CNNBlock(self.channels_h,
-                     self.c_out,
+                     c_out,
                      kernel_size=1,
                      stride=1,
                      padding=0))
 
-    def stochastic_depth (self, x):
-        if not self.training:
+    def stochastic_depth(self, x):
+        if not self.training or self.skip_sto_depth:
             return x
 
-        binary_tensor = torch.rand(x.shape[0], 1, 1, 1) < self.survival_prob.to(device)
+        binary_tensor = (torch.rand(x.shape[0], 1, 1, 1) < self.survival_prob).to(device)
+
         return torch.div(x, self.survival_prob) * binary_tensor
 
     def forward(self, x):
-        res = self.first_conv(x) if self.increase_channels else x
-        h = self.conv(res)
-        return self.stochastic_depth(h) + res
+        h = self.conv(x)
+        print(h.shape)
+        print(self.skip_sto_depth)
+        if self.skip_sto_depth:
+            return h
 
 
-class EfficientNet(nn.Module):
+        return self.stochastic_depth(h) + x
+
+
+class MultiTask_EfficientNet(nn.Module):
     def __init__(self, version, alpha=1.2, beta=1.1):
+        super(MultiTask_EfficientNet, self).__init__()
         phi, res, surv_prob = phi_values[version]
         self.surv_prob = 1 - surv_prob
         self.width_factor = beta**phi
@@ -152,6 +157,7 @@ class EfficientNet(nn.Module):
                                                      padding=padding,
                                                      expand_ratio=expansion,
                                                      survival_prob=self.surv_prob))
+
                     last_num_channels = num_channels
 
                 net.append(InvertedResidualBlock(last_num_channels,
@@ -162,7 +168,9 @@ class EfficientNet(nn.Module):
                                                  expand_ratio=expansion,
                                                  survival_prob=self.surv_prob
                                                  ))
+
                 last_num_channels = num_channels
+
 
         net.append(CNNBlock(
             last_num_channels,
@@ -171,6 +179,7 @@ class EfficientNet(nn.Module):
             stride=1,
             padding=0))
 
+        print(len(net))
         return nn.Sequential(*net)
 
     def forward(self, x):
