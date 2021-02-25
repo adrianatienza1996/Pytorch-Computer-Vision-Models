@@ -57,7 +57,7 @@ class ResNet18_Classifier (nn.Module):
         self.res_block3 = ResBlock(128, 256)
         self.max_pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.res_block4 = ResBlock(256, 512)
-        self.avg_pool1 = nn.AvgPool2d (kernel_size=7)
+        self.avg_pool1 = nn.AvgPool2d(kernel_size=7)
         self.flatten = nn.Flatten()
         self.linear1 = nn.Linear(512, 1000)
 
