@@ -111,6 +111,47 @@ class VGGBase(nn.Module):
         x, y, _, _ = state_dict[param_names[-2]].shape
         state_dict[param_names[-2]] = pretrained_state_dict[pretrained_param_names[-4]][:x, :y]
         state_dict[param_names[-1]] = pretrained_state_dict[pretrained_param_names[-3]][:x]
+        print("Pretrained weights are loaded")\
 
-        print("Pretrained weights are loaded")
+
+
+class Aux_Conv_Block1(nn.Module):
+    def __init__(self, c_in, c_out, inner_dim):
+        super(Aux_Conv_Block1, self).__init__()
+        self.net = nn.Sequential(
+            Conv2D_RELU(c_in=c_in, c_out=inner_dim, kernel_size=1, stride=1, padding=0),
+            Conv2D_RELU(c_in=inner_dim, c_out=c_out, kernel_size=3, stride=2, padding=1)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
+class Aux_Conv_Block2(nn.Module):
+    def __init__(self, c_in, c_out, inner_dim):
+        super(Aux_Conv_Block2, self).__init__()
+        self.net = nn.Sequential(
+            Conv2D_RELU(c_in=c_in, c_out=inner_dim, kernel_size=1, stride=1, padding=0),
+            Conv2D_RELU(c_in=inner_dim, c_out=c_out, kernel_size=3, stride=1, padding=0)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
+class Aux_Conv(nn.Module):
+    def __init__(self):
+        super(Aux_Conv, self).__init__()
+        self.block1 = Aux_Conv_Block1(1024, 512, 256)
+        self.block2 = Aux_Conv_Block1(512, 256, 128)
+        self.block3 = Aux_Conv_Block2(256, 128, 128)
+        self.block4 = Aux_Conv_Block2(256, 128, 128)
+
+    def forward(self, x):
+        features_8 = self.block1(x)
+        features_9 = self.block2(features_8)
+        features_10 = self.block3(features_9)
+        features_11 = self.block4(features_10)
+
+        return features_8, features_9, features_10, features_11
 
