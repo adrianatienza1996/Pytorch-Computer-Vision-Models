@@ -1,5 +1,13 @@
-from torch import nn
+import torch
 import torchvision
+from torch import nn
+
+CONFIG = {'conv4':  (512, 4),
+          'conv7':  (1024, 6),
+          'conv8':  (512, 6),
+          'conv9':  (256, 6),
+          'conv10': (256, 4),
+          'conv11': (256, 4)}
 
 
 class Conv2D_RELU(nn.Module):
@@ -86,9 +94,9 @@ class VGGBase(nn.Module):
         h = self.block1(x)
         h = self.block2(h)
         h = self.block3(h)
-        conv4_3_features, h = self.block4(h)
+        conv4_features, h = self.block4(h)
         h = self.block5(h)
-        return conv4_3_features, self.final_block(h)
+        return conv4_features, self.final_block(h)
 
     def load_pretrained_weights(self):
         # Params of the model
@@ -144,8 +152,8 @@ class Aux_Conv(nn.Module):
         super(Aux_Conv, self).__init__()
         self.block1 = Aux_Conv_Block1(1024, 512, 256)
         self.block2 = Aux_Conv_Block1(512, 256, 128)
-        self.block3 = Aux_Conv_Block2(256, 128, 128)
-        self.block4 = Aux_Conv_Block2(256, 128, 128)
+        self.block3 = Aux_Conv_Block2(256, 256, 128)
+        self.block4 = Aux_Conv_Block2(256, 256, 128)
 
     def forward(self, x):
         features_8 = self.block1(x)
@@ -154,4 +162,55 @@ class Aux_Conv(nn.Module):
         features_11 = self.block4(features_10)
 
         return features_8, features_9, features_10, features_11
+
+
+class Predictor_Block(nn.Module):
+    def __init__(self, c_in, num_priors, num_classes):
+        super(Predictor_Block, self).__init__()
+        self.num_classes = num_classes
+        self.loc_predictor = nn.Conv2d(c_in, int(num_priors * 4),
+                                       kernel_size=3,
+                                       stride=1,
+                                       padding=1)
+        self.label_predictor = nn.Conv2d(c_in, int(num_priors * num_classes),
+                                         kernel_size=3,
+                                         stride=1,
+                                         padding=1)
+
+    def forward(self, x):
+        locs = self.loc_predictor(x)
+        locs = locs.permute(0, 2, 3, 1).contiguous()
+        locs = locs.view(x.shape[0], -1, 4)
+
+        labels = self.label_predictor(x)
+        labels = labels.permute(0, 2, 3, 1).contiguous()
+        labels = labels.view(x.shape[0], -1, self.num_classes)
+
+        return locs, labels
+
+
+class Predictor(nn.Module):
+    def __init__(self, num_classes):
+        super(Predictor, self).__init__()
+        self.predictor4 = Predictor_Block(CONFIG['conv4'][0], CONFIG['conv4'][1], num_classes)
+        self.predictor7 = Predictor_Block(CONFIG['conv7'][0], CONFIG['conv7'][1], num_classes)
+        self.predictor8 = Predictor_Block(CONFIG['conv8'][0], CONFIG['conv8'][1], num_classes)
+        self.predictor9 = Predictor_Block(CONFIG['conv9'][0], CONFIG['conv9'][1], num_classes)
+        self.predictor10 = Predictor_Block(CONFIG['conv10'][0], CONFIG['conv10'][1], num_classes)
+        self.predictor11 = Predictor_Block(CONFIG['conv11'][0], CONFIG['conv11'][1], num_classes)
+
+    def forward(self, features4, features7, features8, features9, features10, features11):
+        locs4, labels4 = self.predictor4(features4)
+        locs7, labels7 = self.predictor7(features7)
+        locs8, labels8 = self.predictor8(features8)
+        locs9, labels9 = self.predictor9(features9)
+        locs10, labels10 = self.predictor10(features10)
+        locs11, labels11 = self.predictor11(features11)
+
+        locs = torch.cat([locs4, locs7, locs8, locs9, locs10, locs11], dim=1)
+        labels = torch.cat([labels4, labels7, labels8, labels9, labels10, labels11], dim=1)
+
+        return locs, labels
+
+
 
