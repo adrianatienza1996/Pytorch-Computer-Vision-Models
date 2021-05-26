@@ -213,4 +213,17 @@ class Predictor(nn.Module):
         return locs, labels
 
 
+class SSD_300(nn.Module):
+    def __init__(self, num_classes):
+        super(SSD_300, self).__init__()
+        self.vgg = VGGBase()
+        self.aux_conv = Aux_Conv()
+        self.predictor = Predictor(num_classes)
+
+    def forward(self, x):
+        features4, features7 = self.vgg(x)
+        features8, features9, features10, features11 = self.aux_conv(features7)
+        locs, labels = self.predictor(features4, features7, features8, features9, features10, features11)
+        return locs, labels
+
 
