@@ -1,14 +1,17 @@
+import numpy as np
 import torch
 import torchvision
 from torch import nn
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-CONFIG = {'conv4':  (512, 4),
-          'conv7':  (1024, 6),
-          'conv8':  (512, 6),
-          'conv9':  (256, 6),
-          'conv10': (256, 4),
-          'conv11': (256, 4)}
+CONFIG = {'conv4':  (512, 4, [1.0, 2.0, 0.5]),
+          'conv7':  (1024, 6, [1.0, 2.0, 3.0, 0.5, 0.333]),
+          'conv8':  (512, 6, [1.0, 2.0, 3.0, 0.5, 0.333]),
+          'conv9':  (256, 6, [1.0, 2.0, 3.0, 0.5, 0.333]),
+          'conv10': (256, 4, [1.0, 2.0, 0.5]),
+          'conv11': (256, 4, [1.0, 2.0, 0.5])}
 
+SCALES = [0.1, 0.2, 0.375, 0.55, 0.725, 0.9]
 
 class Conv2D_RELU(nn.Module):
     def __init__(self, c_in, c_out, kernel_size, stride, padding, dilation=1):
@@ -225,5 +228,41 @@ class SSD_300(nn.Module):
         features8, features9, features10, features11 = self.aux_conv(features7)
         locs, labels = self.predictor(features4, features7, features8, features9, features10, features11)
         return locs, labels
+
+    def get_prior_boxes(self):
+        prior_boxes = []
+
+        def get_coordinates(i, j, scale, aspect_ratio, dim):
+            return [(i + 0.5) / dim, (j + 0.5) / dim, scale * np.sqrt(aspect_ratio), scale / np.sqrt(aspect_ratio)]
+
+        def geometric_mean(x, y):
+            return np.sqrt(x * y)
+
+        for idx, (_, config) in enumerate(CONFIG.items()):
+
+            scale = SCALES[idx]
+            dim = config[2]
+            x, y = np.meshgrid(np.arange(dim), np.arange(dim))
+
+            for ratio in config[3]:
+                prior_boxes.extend([get_coordinates(i, j, scale, ratio, dim) for i, j in zip(np.ravel(x), np.ravel(y))])
+
+            try:
+                add_scale = geometric_mean(SCALES[idx], SCALES[idx + 1])
+
+            except IndexError:
+                add_scale = 1.
+
+            prior_boxes.extend([get_coordinates(i, j, add_scale, 1, dim) for i, j in zip(np.ravel(x), np.ravel(y))])
+
+        prior_boxes = torch.tensor(prior_boxes).float().to(device)
+        prior_boxes.clamp_(0, 1)
+        return prior_boxes
+
+
+
+
+
+
 
 
