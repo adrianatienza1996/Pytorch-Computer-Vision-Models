@@ -61,3 +61,8 @@ class PascalVOC_Dataset(Dataset):
         return im[None]
 
 
+def get_loader(anno_df, images_dir, train=True):
+    dataset = PascalVOC_Dataset(anno_df, images_dir)
+    shuffle = True if train else False
+    loader = DataLoader(dataset, batch_size=32, shuffle=shuffle, drop_last=True, collate_fn=dataset.collate_fn)
+    return loader

@@ -113,10 +113,13 @@ class MultiboxLoss(nn.Module):
         return conf_loss + loc_loss
 
 
-
-
-
-
-
+def train_batch(images, boxes, labels, model, opt, loss_fn):
+    opt.zero_grad()
+    model.train()
+    predicted_locs, predicted_labels = model(images)
+    multi_box_loss = loss_fn(predicted_locs, predicted_labels, boxes, labels)
+    multi_box_loss.backward()
+    opt.step()
+    return multi_box_loss.item()
 
 
