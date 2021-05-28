@@ -259,6 +259,7 @@ class SSD_300(nn.Module):
         prior_boxes.clamp_(0, 1)
         return prior_boxes
 
+    
 
 
 
